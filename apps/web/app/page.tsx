@@ -1,102 +1,177 @@
-import Image, { type ImageProps } from "next/image";
+import { prismaClient } from "@repo/db/client";
 import { Button } from "@repo/ui/button";
+import { Suspense } from "react";
+import { revalidatePath } from "next/cache";
 import styles from "./page.module.css";
 
-type Props = Omit<ImageProps, "src"> & {
-  srcLight: string;
-  srcDark: string;
+// Types for Todo with User
+type TodoWithUser = {
+  id: string;
+  task: string;
+  done: boolean;
+  userId: string;
+  user: {
+    email: string;
+  };
 };
 
-const ThemeImage = (props: Props) => {
-  const { srcLight, srcDark, ...rest } = props;
+// Types for User
+type User = {
+  id: string;
+  email: string;
+};
 
+// Server action to toggle todo status
+async function toggleTodo(todoId: string, currentStatus: boolean) {
+  "use server";
+
+  try {
+    await prismaClient.todo.update({
+      where: { id: todoId },
+      data: { done: !currentStatus },
+    });
+    revalidatePath("/");
+  } catch (error) {
+    console.error("Failed to toggle todo:", error);
+  }
+}
+
+// Server component to fetch users from database
+async function UserList() {
+  try {
+    const users = await prismaClient.user.findMany({
+      orderBy: {
+        email: "asc",
+      },
+    });
+
+    if (users.length === 0) {
+      return (
+        <div className={styles.empty}>
+          <p>No users found.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.userList}>
+        {users.map((user: User) => (
+          <div key={user.id} className={styles.userItem}>
+            <p>{user.email}</p>
+          </div>
+        ))}
+      </div>
+    );
+  } catch (error) {
+    console.error("Database connection error:", error);
+    return (
+      <div className={styles.error}>
+        <p>Failed to fetch users.</p>
+        <pre>{error instanceof Error ? error.message : "Unknown error"}</pre>
+      </div>
+    );
+  }
+}
+
+// Server component to fetch todos from database
+async function TodoList() {
+  try {
+    const todos = await prismaClient.todo.findMany({
+      include: {
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        id: "desc",
+      },
+    });
+
+    if (todos.length === 0) {
+      return (
+        <div className={styles.empty}>
+          <p>No todos found.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className={styles.todoList}>
+        {todos.map((todo: TodoWithUser) => (
+          <div
+            key={todo.id}
+            className={`${styles.todoItem} ${todo.done ? styles.completed : ""}`}
+          >
+            <div className={styles.todoContent}>
+              <h3>{todo.task}</h3>
+              <p>User: {todo.user.email}</p>
+            </div>
+            <div className={styles.todoActions}>
+              <div className={styles.todoStatus}>
+                {todo.done ? (
+                  <span className={styles.doneLabel}>✓ Completed</span>
+                ) : (
+                  <span className={styles.pendingLabel}>⏳ Pending</span>
+                )}
+              </div>
+              <form action={toggleTodo.bind(null, todo.id, todo.done)}>
+                <button
+                  type="submit"
+                  className={`${styles.toggleButton} ${todo.done ? styles.undoButton : styles.completeButton}`}
+                >
+                  {todo.done ? "Mark Undone" : "Mark Done"}
+                </button>
+              </form>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  } catch (error) {
+    console.error("Database connection error:", error);
+    return (
+      <div className={styles.error}>
+        <p>Failed to fetch todos.</p>
+        <pre>{error instanceof Error ? error.message : "Unknown error"}</pre>
+      </div>
+    );
+  }
+}
+
+// Loading component
+function Loading() {
   return (
-    <>
-      <Image {...rest} src={srcLight} className="imgLight" />
-      <Image {...rest} src={srcDark} className="imgDark" />
-    </>
+    <div className={styles.loading}>
+      <p>Loading...</p>
+    </div>
   );
-};
+}
 
 export default function Home() {
   return (
     <div className={styles.page}>
       <main className={styles.main}>
-        <ThemeImage
-          className={styles.logo}
-          srcLight="turborepo-dark.svg"
-          srcDark="turborepo-light.svg"
-          alt="Turborepo logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>apps/web/app/page.tsx</code>
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+        <h1 className={styles.title}>Todo App</h1>
+        <p className={styles.subtitle}>Users and Todos</p>
 
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new/clone?demo-description=Learn+to+implement+a+monorepo+with+a+two+Next.js+sites+that+has+installed+three+local+packages.&demo-image=%2F%2Fimages.ctfassets.net%2Fe5382hct74si%2F4K8ZISWAzJ8X1504ca0zmC%2F0b21a1c6246add355e55816278ef54bc%2FBasic.png&demo-title=Monorepo+with+Turborepo&demo-url=https%3A%2F%2Fexamples-basic-web.vercel.sh%2F&from=templates&project-name=Monorepo+with+Turborepo&repository-name=monorepo-turborepo&repository-url=https%3A%2F%2Fgithub.com%2Fvercel%2Fturborepo%2Ftree%2Fmain%2Fexamples%2Fbasic&root-directory=apps%2Fdocs&skippable-integrations=1&teamSlug=vercel&utm_source=create-turbo"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://turborepo.com/docs?utm_source"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+        <div className={styles.columns}>
+          <div className={styles.column}>
+            <h2>Users</h2>
+            <Suspense fallback={<Loading />}>
+              <UserList />
+            </Suspense>
+          </div>
+
+          <div className={styles.column}>
+            <h2>Todos</h2>
+            <Suspense fallback={<Loading />}>
+              <TodoList />
+            </Suspense>
+          </div>
         </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
       </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://vercel.com/templates?search=turborepo&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://turborepo.com?utm_source=create-turbo"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to turborepo.com →
-        </a>
-      </footer>
     </div>
   );
 }
