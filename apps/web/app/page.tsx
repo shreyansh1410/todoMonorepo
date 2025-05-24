@@ -1,10 +1,13 @@
 import { prismaClient } from "@repo/db/client";
-import { Button } from "@repo/ui/button";
 import { Suspense } from "react";
 import { revalidatePath } from "next/cache";
 import styles from "./page.module.css";
 
-// Types for Todo with User
+type User = {
+  id: string;
+  email: string;
+};
+
 type TodoWithUser = {
   id: string;
   task: string;
@@ -15,13 +18,6 @@ type TodoWithUser = {
   };
 };
 
-// Types for User
-type User = {
-  id: string;
-  email: string;
-};
-
-// Server action to toggle todo status
 async function toggleTodo(todoId: string, currentStatus: boolean) {
   "use server";
 
@@ -36,7 +32,14 @@ async function toggleTodo(todoId: string, currentStatus: boolean) {
   }
 }
 
-// Server component to fetch users from database
+function Loading() {
+  return (
+    <div className={styles.loading}>
+      <p>Loading...</p>
+    </div>
+  );
+}
+
 async function UserList() {
   try {
     const users = await prismaClient.user.findMany({
@@ -140,15 +143,6 @@ async function TodoList() {
   }
 }
 
-// Loading component
-function Loading() {
-  return (
-    <div className={styles.loading}>
-      <p>Loading...</p>
-    </div>
-  );
-}
-
 export default function Home() {
   return (
     <div className={styles.page}>
@@ -175,3 +169,6 @@ export default function Home() {
     </div>
   );
 }
+
+//this page will not generate statically
+export const dynamic = "force-dynamic";

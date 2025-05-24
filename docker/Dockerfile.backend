@@ -1,0 +1,18 @@
+FROM node:23-alpine
+
+# Install specific pnpm version as specified in package.json
+RUN npm install -g pnpm@9.0.0
+
+WORKDIR /usr/src/app
+
+COPY . .
+
+RUN pnpm install
+
+RUN pnpm run generate:db
+
+RUN cd apps/http-backend && pnpm run build
+
+EXPOSE 8080
+
+CMD ["pnpm", "start:backend"]
