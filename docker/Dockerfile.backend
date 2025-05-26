@@ -3,11 +3,17 @@ FROM node:23-alpine
 # Install specific pnpm version as specified in package.json
 RUN npm install -g pnpm@9.0.0
 
+# Accept DATABASE_URL as build argument
+ARG DATABASE_URL
+
 WORKDIR /usr/src/app
 
 COPY . .
 
 RUN pnpm install
+
+# Set DATABASE_URL environment variable for the generate command
+ENV DATABASE_URL=$DATABASE_URL
 
 RUN pnpm run generate:db
 
